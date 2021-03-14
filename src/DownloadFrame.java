@@ -6,8 +6,6 @@ import org.jsoup.select.Elements;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -32,9 +30,9 @@ public class DownloadFrame {
 
     Connection.Response session;
 
-    static String mainUrl = "http://lms.ksa.hs.kr";
-    static String loginUrl = mainUrl + "/Source/Include/login_ok.php";
-    static String boardUrl = mainUrl + "/nboard.php";
+    static final String mainUrl = "http://lms.ksa.hs.kr";
+    static final String loginUrl = mainUrl + "/Source/Include/login_ok.php";
+    static final String boardUrl = mainUrl + "/nboard.php";
 
     public DownloadFrame() {
         f = new JFrame();
