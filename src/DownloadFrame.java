@@ -9,7 +9,6 @@ import java.awt.*;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 
 public class DownloadFrame {
     JFrame frame;
@@ -129,7 +128,7 @@ public class DownloadFrame {
         return downloadPanel;
     }
 
-    public String getScBCate(String urlString) {
+    private String getScBCate(String urlString) {
         try {
             String toFind = "scBCate";
             URL url = new URL(urlString);
@@ -146,25 +145,9 @@ public class DownloadFrame {
         return "";
     }
 
-    public void download() throws IOException {
+    private void download() throws IOException {
         messageLabel.setText("로그인 중...");
         session = loginSession();
-        messageLabel.setText("파일 위치 탐색 중...");
-        ArrayList<String> fileUrls = allFileUrls();
-        for (int i=0; i<fileUrls.size(); i++) {
-            messageLabel.setText(String.format("다운로드 중... %d/%d", i+1, fileUrls.size()));
-            HttpDownloadUtility.downloadFile(fileUrls.get(i), folderPath);
-        }
-        messageLabel.setText("");
-        JOptionPane.showMessageDialog(null, "다운로드 완료");
-    }
-
-    public Connection.Response loginSession() throws IOException {
-        return Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw)
-                .method(Connection.Method.POST).execute();
-    }
-
-    public ArrayList<String> allFileUrls() throws IOException {
         Document firstPage = Jsoup.connect(boardUrl).data("db", "vod").data("scBCate", scBCate)
                 .cookies(session.cookies()).get();
         int pagesNum = boardPagesNum(firstPage);
@@ -176,7 +159,6 @@ public class DownloadFrame {
         if (to == 0) {
             to = postsNum;
         }
-        ArrayList<String> fileUrls = new ArrayList<>();
         int startPage = (postsNum-to)/postsInPage+1;
         int endPage = (postsNum-from)/postsInPage+1;
         Document pageDoc;
@@ -189,51 +171,55 @@ public class DownloadFrame {
             Elements postRows = tbody.get(0).getElementsByTag("tr");
             for (Element postRow:postRows) {
                 if (from <= postIndex && postIndex <= to) {
+                    messageLabel.setText(String.format("다운로드 중... %d/%d", to-postIndex+1, to-from+1));
                     Elements postLinktd = postRow.getElementsByClass("tdPad4L6px");
                     if (postLinktd.get(0).getElementsByTag("a").size() > 0) {
                         String postUrl = postLinktd.get(0).getElementsByTag("a").get(0).attr("href");
-                        fileUrls.addAll(getFileUrl(mainUrl + postUrl));
+                        downloadPost(mainUrl + postUrl);
                     }
                 }
-                System.out.print(postIndex);
                 postIndex--;
-                System.out.print(postRow);
-
             }
         }
-        return fileUrls;
+        messageLabel.setText("");
+        JOptionPane.showMessageDialog(null, "다운로드 완료");
     }
 
-    public int boardPagesNum(Document pageDoc) {
+    private Connection.Response loginSession() throws IOException {
+        return Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw)
+                .method(Connection.Method.POST).execute();
+    }
+
+    private int boardPagesNum(Document pageDoc) {
         String info = pageDoc.getElementsByClass("NB_tPageArea").get(0).text();
         int startIndex = info.indexOf("/")+1;
         int endIndex = info.indexOf("page");
         return Integer.parseInt(info.substring(startIndex, endIndex).strip());
     }
 
-    public int boardPostsNum(Document pageDoc) {
+    private int boardPostsNum(Document pageDoc) {
         String info = pageDoc.getElementsByClass("NB_tPageArea").get(0).text();
         int startIndex = info.indexOf(":")+1;
         int endIndex = info.indexOf("건");
         return Integer.parseInt(info.substring(startIndex, endIndex).strip());
     }
 
-    public ArrayList<String> getFileUrl(String postUrl) throws IOException {
+    private void downloadPost(String postUrl) throws IOException {
         Document postDoc = Jsoup.connect(postUrl).cookies(session.cookies()).get();
         Element infoTable = postDoc.getElementById("NB_FormTable");
         Elements infoRows = infoTable.getElementsByTag("tr");
-        ArrayList<String> fileUrls = new ArrayList<>();
         for (Element infoRow:infoRows) {
             Elements label = infoRow.getElementsByClass("nbLabelField pad");
             if (label.size() > 0) {
                 if (label.get(0).text().contains("첨부파일")) {
                     Elements links = infoRow.getElementsByTag("a");
                     for (Element link:links) {
-                        fileUrls.add(mainUrl + link.attr("href"));
+                        String fileName = link.text();
+                        fileName = fileName.substring(0, fileName.lastIndexOf("(")).strip();
+                        HttpDownloadUtility.downloadFile(mainUrl + link.attr("href"), folderPath, fileName);
                     }
                 }
             }
         }
-        return fileUrls;
     }
 }

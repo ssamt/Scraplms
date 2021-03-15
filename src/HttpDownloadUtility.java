@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
 
 /**
  * A utility that downloads a file from a URL.
@@ -15,7 +16,7 @@ import java.net.URL;
 public class HttpDownloadUtility {
     private static final int BUFFER_SIZE = 4096;
 
-    public static void downloadFile(String fileURL, String saveDir)
+    public static void downloadFile(String fileURL, String saveDir, String fileName)
             throws IOException {
         URL url = new URL(fileURL);
         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
@@ -23,21 +24,9 @@ public class HttpDownloadUtility {
 
         // always check HTTP response code first
         if (responseCode == HttpURLConnection.HTTP_OK) {
-            String fileName = "";
             String disposition = httpConn.getHeaderField("Content-Disposition");
             String contentType = httpConn.getContentType();
             int contentLength = httpConn.getContentLength();
-
-            if (disposition != null) {
-                // extracts file name from header field
-                int index = disposition.indexOf("filename=");
-                if (index > 0) {
-                    fileName = disposition.substring(index + 9);
-                }
-            } else {
-                // extracts file name from URL
-                fileName = fileURL.substring(fileURL.lastIndexOf("/") + 1);
-            }
 
             System.out.println("Content-Type = " + contentType);
             System.out.println("Content-Disposition = " + disposition);
