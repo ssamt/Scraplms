@@ -12,7 +12,7 @@ import java.net.URL;
 import java.util.ArrayList;
 
 public class DownloadFrame {
-    JFrame f;
+    JFrame frame;
     JTextField urlField;
     JTextField folderField;
     JTextField fromField;
@@ -35,14 +35,14 @@ public class DownloadFrame {
     static final String boardUrl = mainUrl + "/nboard.php";
 
     public DownloadFrame() {
-        f = new JFrame();
-        f.setSize(800, 400);
-        f.setLayout(new GridLayout(10, 1, 0, 3));
-        f.add(createUrlPanel());
-        f.add(createFolderPanel());
-        f.add(createIndexPanel());
-        f.add(createIdPwPanel());
-        f.add(createDownloadPanel());
+        frame = new JFrame();
+        frame.setSize(800, 400);
+        frame.setLayout(new GridLayout(10, 1, 0, 3));
+        frame.add(createUrlPanel());
+        frame.add(createFolderPanel());
+        frame.add(createIndexPanel());
+        frame.add(createIdPwPanel());
+        frame.add(createDownloadPanel());
     }
 
     private JPanel createUrlPanel() {
@@ -160,11 +160,8 @@ public class DownloadFrame {
     }
 
     public Connection.Response loginSession() throws IOException {
-        return Jsoup.connect(loginUrl)
-                .data("user_id", this.id)
-                .data("user_pwd", this.pw)
-                .method(Connection.Method.POST)
-                .execute();
+        return Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw)
+                .method(Connection.Method.POST).execute();
     }
 
     public ArrayList<String> allFileUrls() throws IOException {
@@ -188,16 +185,20 @@ public class DownloadFrame {
                     .data("scBCate", scBCate)
                     .cookies(session.cookies()).get();
             Element table = pageDoc.getElementById("NB_ListTable");
-            Elements postRows = table.getElementsByTag("tr");
+            Elements tbody = table.getElementsByTag("tbody");
+            Elements postRows = tbody.get(0).getElementsByTag("tr");
             for (Element postRow:postRows) {
                 if (from <= postIndex && postIndex <= to) {
                     Elements postLinktd = postRow.getElementsByClass("tdPad4L6px");
                     if (postLinktd.get(0).getElementsByTag("a").size() > 0) {
                         String postUrl = postLinktd.get(0).getElementsByTag("a").get(0).attr("href");
-                        fileUrls.addAll(getFileUrl(postUrl));
+                        fileUrls.addAll(getFileUrl(mainUrl + postUrl));
                     }
                 }
+                System.out.print(postIndex);
                 postIndex--;
+                System.out.print(postRow);
+
             }
         }
         return fileUrls;
@@ -228,7 +229,7 @@ public class DownloadFrame {
                 if (label.get(0).text().contains("첨부파일")) {
                     Elements links = infoRow.getElementsByTag("a");
                     for (Element link:links) {
-                        fileUrls.add(link.attr("href"));
+                        fileUrls.add(mainUrl + link.attr("href"));
                     }
                 }
             }
