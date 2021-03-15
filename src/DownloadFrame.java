@@ -18,6 +18,7 @@ public class DownloadFrame {
     JTextField toField;
     JTextField idField;
     JPasswordField pwField;
+    JPanel downloadPanel;
     JLabel messageLabel;
 
     static FlowLayout leftLayout = new FlowLayout(FlowLayout.LEFT);
@@ -26,6 +27,8 @@ public class DownloadFrame {
     String folderPath;
     int from, to;
     String id, pw;
+
+    int downloadSuccessNum;
 
     Connection.Response session;
 
@@ -41,7 +44,8 @@ public class DownloadFrame {
         frame.add(createFolderPanel());
         frame.add(createIndexPanel());
         frame.add(createIdPwPanel());
-        frame.add(createDownloadPanel());
+        downloadPanel = createDownloadPanel();
+        frame.add(downloadPanel);
     }
 
     private JPanel createUrlPanel() {
@@ -102,20 +106,24 @@ public class DownloadFrame {
         JPanel downloadPanel = new JPanel(leftLayout);
         JButton downloadButton = new JButton("다운로드");
         downloadButton.addActionListener(actionEvent -> {
-            scBCate = getScBCate(urlField.toString());
-            folderPath = folderField.toString();
-            if (fromField.toString().equals("")) {
+            if (urlField.getText().contains("http")) {
+                scBCate = getScBCate(urlField.getText());
+            } else {
+                scBCate = getScBCate("http://" + urlField.getText());
+            }
+            folderPath = folderField.getText();
+            if (fromField.getText().equals("")) {
                 from = 0;
             } else {
-                from = Integer.parseInt(fromField.toString());
+                from = Integer.parseInt(fromField.getText());
             }
-            if (toField.toString().equals("")) {
+            if (toField.getText().equals("")) {
                 to = 0;
             } else {
-                to = Integer.parseInt(toField.toString());
+                to = Integer.parseInt(toField.getText());
             }
-            id = idField.toString();
-            pw = pwField.toString();
+            id = idField.getText();
+            pw = String.valueOf(pwField.getPassword());
             try {
                 download();
             } catch (IOException e) {
@@ -125,10 +133,11 @@ public class DownloadFrame {
         downloadPanel.add(downloadButton);
         messageLabel = new JLabel("");
         downloadPanel.add(messageLabel);
+        messageLabel.setText("abcd");
         return downloadPanel;
     }
 
-    private String getScBCate(String urlString) {
+    public String getScBCate(String urlString) {
         try {
             String toFind = "scBCate";
             URL url = new URL(urlString);
@@ -146,7 +155,7 @@ public class DownloadFrame {
     }
 
     private void download() throws IOException {
-        messageLabel.setText("로그인 중...");
+        changeMessage("로그인 중");
         session = loginSession();
         Document firstPage = Jsoup.connect(boardUrl).data("db", "vod").data("scBCate", scBCate)
                 .cookies(session.cookies()).get();
@@ -159,6 +168,7 @@ public class DownloadFrame {
         if (to == 0) {
             to = postsNum;
         }
+        downloadSuccessNum = 0;
         int startPage = (postsNum-to)/postsInPage+1;
         int endPage = (postsNum-from)/postsInPage+1;
         Document pageDoc;
@@ -171,18 +181,25 @@ public class DownloadFrame {
             Elements postRows = tbody.get(0).getElementsByTag("tr");
             for (Element postRow:postRows) {
                 if (from <= postIndex && postIndex <= to) {
-                    messageLabel.setText(String.format("다운로드 중... %d/%d", to-postIndex+1, to-from+1));
+                    changeMessage(String.format("다운로드 중... %d/%d", to-postIndex+1, to-from+1));
                     Elements postLinktd = postRow.getElementsByClass("tdPad4L6px");
                     if (postLinktd.get(0).getElementsByTag("a").size() > 0) {
                         String postUrl = postLinktd.get(0).getElementsByTag("a").get(0).attr("href");
                         downloadPost(mainUrl + postUrl);
+                        downloadSuccessNum++;
                     }
                 }
                 postIndex--;
             }
         }
-        messageLabel.setText("");
-        JOptionPane.showMessageDialog(null, "다운로드 완료");
+        int downloadFailedNum = (to-from+1)-downloadSuccessNum;
+        if (downloadFailedNum == 0) {
+            JOptionPane.showMessageDialog(null, "다운로드 완료");
+            changeMessage("");
+        } else {
+            JOptionPane.showMessageDialog(null, String.format("%d개 중 %d개 다운로드 완료", to-from+1, downloadSuccessNum));
+            changeMessage(String.format("%d개 다운로드 실패", downloadFailedNum));
+        }
     }
 
     private Connection.Response loginSession() throws IOException {
@@ -221,5 +238,13 @@ public class DownloadFrame {
                 }
             }
         }
+    }
+
+    private void changeMessage(String message) {
+        messageLabel.setText(message);
+        downloadPanel.remove(messageLabel);
+        downloadPanel.add(messageLabel);
+        downloadPanel.revalidate();
+        downloadPanel.repaint();
     }
 }
