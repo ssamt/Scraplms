@@ -9,6 +9,8 @@ import java.awt.*;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 public class DownloadFrame {
     JFrame frame;
@@ -22,19 +24,6 @@ public class DownloadFrame {
     JLabel messageLabel;
 
     static FlowLayout leftLayout = new FlowLayout(FlowLayout.LEFT);
-
-    String scBCate;
-    String folderPath;
-    int from, to;
-    String id, pw;
-
-    int downloadSuccessNum;
-
-    Connection.Response session;
-
-    static final String mainUrl = "http://lms.ksa.hs.kr";
-    static final String loginUrl = mainUrl + "/Source/Include/login_ok.php";
-    static final String boardUrl = mainUrl + "/nboard.php";
 
     public DownloadFrame() {
         frame = new JFrame();
@@ -106,6 +95,10 @@ public class DownloadFrame {
         JPanel downloadPanel = new JPanel(leftLayout);
         JButton downloadButton = new JButton("다운로드");
         downloadButton.addActionListener(actionEvent -> {
+            String scBCate;
+            String folderPath;
+            int from, to;
+            String id, pw;
             if (urlField.getText().contains("http")) {
                 scBCate = getScBCate(urlField.getText());
             } else {
@@ -124,16 +117,12 @@ public class DownloadFrame {
             }
             id = idField.getText();
             pw = String.valueOf(pwField.getPassword());
-            try {
-                download();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            DownloadTask downloadTask = new DownloadTask(scBCate, folderPath, from, to, id, pw, messageLabel);
+            downloadTask.execute();
         });
         downloadPanel.add(downloadButton);
         messageLabel = new JLabel("");
         downloadPanel.add(messageLabel);
-        messageLabel.setText("abcd");
         return downloadPanel;
     }
 
@@ -153,9 +142,36 @@ public class DownloadFrame {
         }
         return "";
     }
+}
 
-    private void download() throws IOException {
-        changeMessage("로그인 중");
+class DownloadTask extends SwingWorker<String, String> {
+    String scBCate;
+    String folderPath;
+    int from, to;
+    String id, pw;
+    JLabel messageLabel;
+
+    int downloadSuccessNum;
+
+    Connection.Response session;
+
+    static final String mainUrl = "http://lms.ksa.hs.kr";
+    static final String loginUrl = mainUrl + "/Source/Include/login_ok.php";
+    static final String boardUrl = mainUrl + "/nboard.php";
+
+    public DownloadTask(String scBCate, String folderPath, int from, int to, String id, String pw, JLabel messageLabel) {
+        this.scBCate = scBCate;
+        this.folderPath = folderPath;
+        this.from = from;
+        this.to = to;
+        this.id = id;
+        this.pw = pw;
+        this.messageLabel = messageLabel;
+    }
+
+    @Override
+    protected String doInBackground() throws Exception {
+        publish("로그인 중...");
         session = loginSession();
         Document firstPage = Jsoup.connect(boardUrl).data("db", "vod").data("scBCate", scBCate)
                 .cookies(session.cookies()).get();
@@ -181,7 +197,7 @@ public class DownloadFrame {
             Elements postRows = tbody.get(0).getElementsByTag("tr");
             for (Element postRow:postRows) {
                 if (from <= postIndex && postIndex <= to) {
-                    changeMessage(String.format("다운로드 중... %d/%d", to-postIndex+1, to-from+1));
+                    publish(String.format("다운로드 중... %d/%d", to-postIndex+1, to-from+1));
                     Elements postLinktd = postRow.getElementsByClass("tdPad4L6px");
                     if (postLinktd.get(0).getElementsByTag("a").size() > 0) {
                         String postUrl = postLinktd.get(0).getElementsByTag("a").get(0).attr("href");
@@ -193,16 +209,24 @@ public class DownloadFrame {
             }
         }
         int downloadFailedNum = (to-from+1)-downloadSuccessNum;
+        String dialog;
         if (downloadFailedNum == 0) {
-            JOptionPane.showMessageDialog(null, "다운로드 완료");
-            changeMessage("");
+            publish("");
         } else {
-            JOptionPane.showMessageDialog(null, String.format("%d개 중 %d개 다운로드 완료", to-from+1, downloadSuccessNum));
-            changeMessage(String.format("%d개 다운로드 실패", downloadFailedNum));
+            publish(String.format("%d개 다운로드 실패", downloadFailedNum));
+        }
+        JOptionPane.showMessageDialog(null, "다운로드 완료");
+        return null;
+    }
+
+    @Override
+    protected void process(List<String> chunks) {
+        for (String chuck:chunks) {
+            messageLabel.setText(chuck);
         }
     }
 
-    private Connection.Response loginSession() throws IOException {
+    public Connection.Response loginSession() throws IOException {
         return Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw)
                 .method(Connection.Method.POST).execute();
     }
@@ -238,13 +262,5 @@ public class DownloadFrame {
                 }
             }
         }
-    }
-
-    private void changeMessage(String message) {
-        messageLabel.setText(message);
-        downloadPanel.remove(messageLabel);
-        downloadPanel.add(messageLabel);
-        downloadPanel.revalidate();
-        downloadPanel.repaint();
     }
 }
