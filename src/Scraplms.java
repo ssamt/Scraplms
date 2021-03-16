@@ -1,5 +1,3 @@
-import java.io.IOException;
-
 public class Scraplms {
     public static void main(String[] args) {
         DownloadFrame f = new DownloadFrame();

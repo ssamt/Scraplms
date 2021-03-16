@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 public class DownloadFrame {
     JFrame frame;
@@ -20,6 +19,7 @@ public class DownloadFrame {
     JTextField toField;
     JTextField idField;
     JPasswordField pwField;
+    JCheckBox includeNameBox;
     JPanel downloadPanel;
     JLabel messageLabel;
 
@@ -33,6 +33,7 @@ public class DownloadFrame {
         frame.add(createFolderPanel());
         frame.add(createIndexPanel());
         frame.add(createIdPwPanel());
+        frame.add(createIncludeNamePanel());
         downloadPanel = createDownloadPanel();
         frame.add(downloadPanel);
     }
@@ -91,6 +92,15 @@ public class DownloadFrame {
         return IdPwPanel;
     }
 
+    private JPanel createIncludeNamePanel() {
+        JPanel includeNamePanel = new JPanel(leftLayout);
+        JLabel explainLabel = new JLabel("작성자를 파일명에 포함: ");
+        includeNamePanel.add(explainLabel);
+        includeNameBox = new JCheckBox();
+        includeNamePanel.add(includeNameBox);
+        return includeNamePanel;
+    }
+
     private JPanel createDownloadPanel() {
         JPanel downloadPanel = new JPanel(leftLayout);
         JButton downloadButton = new JButton("다운로드");
@@ -99,6 +109,7 @@ public class DownloadFrame {
             String folderPath;
             int from, to;
             String id, pw;
+            boolean includeName;
             if (urlField.getText().contains("http")) {
                 scBCate = getScBCate(urlField.getText());
             } else {
@@ -117,7 +128,8 @@ public class DownloadFrame {
             }
             id = idField.getText();
             pw = String.valueOf(pwField.getPassword());
-            DownloadTask downloadTask = new DownloadTask(scBCate, folderPath, from, to, id, pw, messageLabel);
+            includeName = includeNameBox.isSelected();
+            DownloadTask downloadTask = new DownloadTask(scBCate, folderPath, from, to, id, pw, includeName, messageLabel);
             downloadTask.execute();
         });
         downloadPanel.add(downloadButton);
@@ -126,7 +138,7 @@ public class DownloadFrame {
         return downloadPanel;
     }
 
-    public String getScBCate(String urlString) {
+    private String getScBCate(String urlString) {
         try {
             String toFind = "scBCate";
             URL url = new URL(urlString);
@@ -150,6 +162,7 @@ class DownloadTask extends SwingWorker<String, String> {
     int from, to;
     String id, pw;
     JLabel messageLabel;
+    boolean includeName;
 
     int downloadSuccessNum;
 
@@ -159,7 +172,8 @@ class DownloadTask extends SwingWorker<String, String> {
     static final String loginUrl = mainUrl + "/Source/Include/login_ok.php";
     static final String boardUrl = mainUrl + "/nboard.php";
 
-    public DownloadTask(String scBCate, String folderPath, int from, int to, String id, String pw, JLabel messageLabel) {
+    public DownloadTask(String scBCate, String folderPath, int from, int to, String id, String pw,
+                        boolean includeName, JLabel messageLabel) {
         this.scBCate = scBCate;
         this.folderPath = folderPath;
         this.from = from;
@@ -167,6 +181,7 @@ class DownloadTask extends SwingWorker<String, String> {
         this.id = id;
         this.pw = pw;
         this.messageLabel = messageLabel;
+        this.includeName = includeName;
     }
 
     @Override
@@ -188,6 +203,7 @@ class DownloadTask extends SwingWorker<String, String> {
         int startPage = (postsNum-to)/postsInPage+1;
         int endPage = (postsNum-from)/postsInPage+1;
         Document pageDoc;
+        String poster;
         for (int page=startPage, postIndex=postsNum-(startPage-1)*postsInPage; page<=endPage; page++) {
             pageDoc = Jsoup.connect(boardUrl).data("page", Integer.toString(page)).data("db", "vod")
                     .data("scBCate", scBCate)
@@ -196,12 +212,13 @@ class DownloadTask extends SwingWorker<String, String> {
             Elements tbody = table.getElementsByTag("tbody");
             Elements postRows = tbody.get(0).getElementsByTag("tr");
             for (Element postRow:postRows) {
+                poster = postRow.getElementsByClass("Board").get(0).text();
                 if (from <= postIndex && postIndex <= to) {
                     publish(String.format("다운로드 중... %d/%d", to-postIndex+1, to-from+1));
                     Elements postLinktd = postRow.getElementsByClass("tdPad4L6px");
                     if (postLinktd.get(0).getElementsByTag("a").size() > 0) {
                         String postUrl = postLinktd.get(0).getElementsByTag("a").get(0).attr("href");
-                        downloadPost(mainUrl + postUrl);
+                        downloadPost(mainUrl + postUrl, poster);
                         downloadSuccessNum++;
                     }
                 }
@@ -226,7 +243,7 @@ class DownloadTask extends SwingWorker<String, String> {
         }
     }
 
-    public Connection.Response loginSession() throws IOException {
+    private Connection.Response loginSession() throws IOException {
         return Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw)
                 .method(Connection.Method.POST).execute();
     }
@@ -245,10 +262,12 @@ class DownloadTask extends SwingWorker<String, String> {
         return Integer.parseInt(info.substring(startIndex, endIndex).strip());
     }
 
-    private void downloadPost(String postUrl) throws IOException {
+    private void downloadPost(String postUrl, String poster) throws IOException  {
         Document postDoc = Jsoup.connect(postUrl).cookies(session.cookies()).get();
         Element infoTable = postDoc.getElementById("NB_FormTable");
         Elements infoRows = infoTable.getElementsByTag("tr");
+        String text;
+        int startIndex, endIndex;
         for (Element infoRow:infoRows) {
             Elements label = infoRow.getElementsByClass("nbLabelField pad");
             if (label.size() > 0) {
@@ -257,6 +276,9 @@ class DownloadTask extends SwingWorker<String, String> {
                     for (Element link:links) {
                         String fileName = link.text();
                         fileName = fileName.substring(0, fileName.lastIndexOf("(")).strip();
+                        if (includeName) {
+                            fileName = String.format("(%s)%s", poster, fileName);
+                        }
                         HttpDownloadUtility.downloadFile(mainUrl + link.attr("href"), folderPath, fileName);
                     }
                 }
