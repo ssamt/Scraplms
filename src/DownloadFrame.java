@@ -121,6 +121,12 @@ public class DownloadFrame {
                 messageLabel.setText("URL이 올바르지 않음");
                 return;
             }
+            try {
+                Integer.parseInt(scBCate);
+            } catch (NumberFormatException e) {
+                messageLabel.setText("URL이 올바르지 않음");
+                return;
+            }
             folderPath = folderField.getText();
             if (! Files.isDirectory(Paths.get(folderPath))) {
                 messageLabel.setText("폴더가 존재하지 않음");
@@ -213,8 +219,8 @@ class DownloadTask extends SwingWorker<String, String> {
     @Override
     protected String doInBackground() throws Exception {
         publish("로그인 중...");
-        if (! Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw).post().text().contains("location.replace")) {
-            messageLabel.setText("로그인 실패");
+        if (! Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw).post().toString().contains("location.replace")) {
+            publish("로그인 실패");
             return "로그인 실패";
         }
         session = loginSession();
