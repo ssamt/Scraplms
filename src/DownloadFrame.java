@@ -9,6 +9,8 @@ import java.awt.*;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 
 public class DownloadFrame {
@@ -115,16 +117,40 @@ public class DownloadFrame {
             } else {
                 scBCate = getScBCate("http://" + urlField.getText());
             }
+            if (scBCate.equals("")) {
+                messageLabel.setText("URL이 올바르지 않음");
+                return;
+            }
             folderPath = folderField.getText();
+            if (! Files.isDirectory(Paths.get(folderPath))) {
+                messageLabel.setText("폴더가 존재하지 않음");
+                return;
+            }
             if (fromField.getText().equals("")) {
                 from = 0;
             } else {
-                from = Integer.parseInt(fromField.getText());
+                try {
+                    from = Integer.parseInt(fromField.getText());
+                } catch (NumberFormatException e) {
+                    messageLabel.setText("번호가 올바르지 않음");
+                    return;
+                }
+            }
+            if (from < 0) {
+                from = 0;
             }
             if (toField.getText().equals("")) {
                 to = 0;
             } else {
-                to = Integer.parseInt(toField.getText());
+                try {
+                    to = Integer.parseInt(toField.getText());
+                } catch (NumberFormatException e) {
+                    messageLabel.setText("번호가 올바르지 않음");
+                    return;
+                }
+            }
+            if (to < 0) {
+                to = 0;
             }
             id = idField.getText();
             pw = String.valueOf(pwField.getPassword());
@@ -187,6 +213,10 @@ class DownloadTask extends SwingWorker<String, String> {
     @Override
     protected String doInBackground() throws Exception {
         publish("로그인 중...");
+        if (! Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw).post().text().contains("location.replace")) {
+            messageLabel.setText("로그인 실패");
+            return "로그인 실패";
+        }
         session = loginSession();
         Document firstPage = Jsoup.connect(boardUrl).data("db", "vod").data("scBCate", scBCate)
                 .cookies(session.cookies()).get();
@@ -195,8 +225,12 @@ class DownloadTask extends SwingWorker<String, String> {
         int postsInPage = 20;
         if (from == 0) {
             from = 1;
+        } else if (from > postsNum) {
+            from = postsNum;
         }
         if (to == 0) {
+            to = postsNum;
+        } else if (to > postsNum) {
             to = postsNum;
         }
         downloadSuccessNum = 0;
