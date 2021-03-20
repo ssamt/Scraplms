@@ -9,6 +9,7 @@ import java.awt.*;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -219,9 +220,18 @@ class DownloadTask extends SwingWorker<String, String> {
     @Override
     protected String doInBackground() throws Exception {
         publish("로그인 중...");
+        try {
+            URL url = new URL(mainUrl);
+            URLConnection connection = url.openConnection();
+            connection.connect();
+            connection.getInputStream();
+        } catch (IOException e) {
+            publish("LMS에 접속할 수 없음");
+            return null;
+        }
         if (! Jsoup.connect(loginUrl).data("user_id", id).data("user_pwd", pw).post().toString().contains("location.replace")) {
             publish("로그인 실패");
-            return "로그인 실패";
+            return null;
         }
         session = loginSession();
         Document firstPage = Jsoup.connect(boardUrl).data("db", "vod").data("scBCate", scBCate)
